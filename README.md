@@ -1,6 +1,7 @@
 # Attendance Management System
 
-A comprehensive web-based attendance management system with role-based access control, built with React.js, Node.js, and PostgreSQL.
+Complete Organizational Management Solution
+Streamline your organization's operations with our comprehensive management system. Track attendance, manage members, handle permissions, create announcements, and maintain discipline - all in one powerful platform.
 
 ## 🚀 Features
 
