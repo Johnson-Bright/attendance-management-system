@@ -17,10 +17,38 @@ app.use(
 );
 
 const { Pool } = pkg;
-let pool = null;
-if (process.env.DATABASE_URL) {
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Singleton Pattern: Database Connection Manager
+class DatabaseManager {
+  constructor() {
+    if (DatabaseManager.instance) {
+      return DatabaseManager.instance;
+    }
+    
+    this.pool = null;
+    if (process.env.DATABASE_URL) {
+      this.pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    }
+    
+    DatabaseManager.instance = this;
+    return this;
+  }
+  
+  getPool() {
+    return this.pool;
+  }
+  
+  async query(text, params) {
+    if (!this.pool) {
+      throw new Error('Database not connected');
+    }
+    return this.pool.query(text, params);
+  }
 }
+
+// Create singleton instance
+const dbManager = new DatabaseManager();
+const pool = dbManager.getPool();
 
 async function ensureSchema() {
   if (!pool) return;

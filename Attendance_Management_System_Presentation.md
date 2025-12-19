@@ -535,7 +535,90 @@ New User    Frontend     Backend      Database
 
 ---
 
-## Slide 11: Technology Stack
+## Slide 11: Software Design Patterns Implementation
+
+# **Design Patterns Used in the System**
+
+### **🏗️ Implemented Design Patterns**
+
+#### **1. Singleton Pattern**
+```javascript
+class DatabaseManager {
+  constructor() {
+    if (DatabaseManager.instance) {
+      return DatabaseManager.instance;
+    }
+    // Single database connection instance
+  }
+}
+```
+- **Purpose**: Ensures single database connection
+- **Location**: Backend database management
+- **Benefit**: Resource efficiency and consistency
+
+#### **2. Factory Pattern**
+```typescript
+async function request(path: string, init?: RequestInit) {
+  // Centralized API request creation
+}
+export async function login(email: string, password?: string) {
+  return request("/login", { method: "POST", ... });
+}
+```
+- **Purpose**: Creates and manages HTTP requests
+- **Location**: Frontend API layer
+- **Benefit**: Consistent error handling and request management
+
+#### **3. Strategy Pattern**
+```typescript
+if (currentUser.role === 'ceo') {
+  return <CEODashboard {...props} />;
+} else if (currentUser.role === 'discipline') {
+  return <DisciplineDashboard {...props} />;
+}
+```
+- **Purpose**: Role-based dashboard selection
+- **Location**: Main App component
+- **Benefit**: Dynamic behavior based on user role
+
+#### **4. Observer Pattern**
+```typescript
+const [currentUser, setCurrentUser] = useState<User | null>(null);
+// React hooks automatically notify observers of state changes
+```
+- **Purpose**: State management and UI updates
+- **Location**: Throughout React components
+- **Benefit**: Reactive user interface
+
+#### **5. Repository Pattern**
+```javascript
+app.get("/members", async (req, res) => {
+  const result = await pool.query("SELECT * FROM members...");
+  // Abstract database operations
+});
+```
+- **Purpose**: Data access layer abstraction
+- **Location**: Backend API endpoints
+- **Benefit**: Separation of business logic from data access
+
+#### **6. Component Pattern**
+```typescript
+export function CEODashboard({ user, company, onLogout }: Props) {
+  // Encapsulated UI functionality
+}
+```
+- **Purpose**: Reusable UI components
+- **Location**: All React components
+- **Benefit**: Maintainable and testable code
+
+### **🎯 Pattern Benefits**
+- **Code Quality**: Maintainable, scalable, testable architecture
+- **System Design**: Separation of concerns, loose coupling
+- **Development**: Reusability, consistency, team collaboration
+
+---
+
+## Slide 12: Technology Stack
 
 # **Technology Stack & Tools**
 
