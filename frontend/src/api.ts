@@ -1,29 +1,140 @@
-import type { Member, AttendanceRecord, Announcement, PermissionRequest, Case, Idea, Company, User, Comment } from "./App";
+/**
+ * @fileoverview API client for Attendance Management System
+ * @description Centralized HTTP client with type-safe API calls
+ * @author Attendance Management Team
+ * @version 1.0.0
+ */
 
-const BASE_URL = "http://localhost:3001";
+import type { 
+  Member, 
+  AttendanceRecord, 
+  Announcement, 
+  PermissionRequest, 
+  Case, 
+  Company, 
+  User, 
+  Comment 
+} from './App';
 
-async function request(path: string, init?: RequestInit) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || `http_error_${res.status}`);
+// Configuration constants
+const BASE_URL = 'http://localhost:3001';
+const DEFAULT_HEADERS = {
+  'Content-Type': 'application/json',
+};
+
+/**
+ * HTTP request timeout in milliseconds
+ */
+const REQUEST_TIMEOUT = 10000;
+
+/**
+ * Custom error class for API errors
+ */
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
   }
-  return res.json();
 }
 
-export async function login(email: string, password?: string): Promise<{ user: User; token: string }> {
-  return request("/login", { method: "POST", body: JSON.stringify({ email, password }) });
+/**
+ * Generic HTTP request function with error handling
+ * Factory Pattern: Creates standardized HTTP requests
+ * @param path - API endpoint path
+ * @param init - Fetch request options
+ * @returns Promise resolving to parsed JSON response
+ * @throws {ApiError} When request fails
+ */
+async function request<T = any>(path: string, init?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  
+  try {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      headers: DEFAULT_HEADERS,
+      signal: controller.signal,
+      ...init,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(
+        errorData?.error || `HTTP ${response.status}`,
+        response.status,
+        errorData?.code
+      );
+    }
+    
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    if (error.name === 'AbortError') {
+      throw new ApiError('Request timeout', 408, 'TIMEOUT');
+    }
+    
+    throw new ApiError('Network error', 0, 'NETWORK_ERROR');
+  }
 }
 
+// Authentication API
+
+/**
+ * Authenticates user with email and optional password
+ * @param email - User email address
+ * @param password - User password (optional for demo mode)
+ * @returns Promise resolving to user data and authentication token
+ */
+export async function login(
+  email: string, 
+  password?: string
+): Promise<{ user: User; token: string }> {
+  if (!email?.trim()) {
+    throw new ApiError('Email is required', 400, 'INVALID_EMAIL');
+  }
+  
+  return request('/login', { 
+    method: 'POST', 
+    body: JSON.stringify({ email: email.trim(), password }) 
+  });
+}
+
+// Company Management API
+
+/**
+ * Retrieves all companies
+ * @returns Promise resolving to array of companies
+ */
 export async function getCompanies(): Promise<Company[]> {
-  return request("/companies");
+  return request<Company[]>('/companies');
 }
 
-export async function createCompany(data: Omit<Company, "id" | "createdAt">): Promise<Company> {
-  return request("/companies", { method: "POST", body: JSON.stringify(data) });
+/**
+ * Creates a new company
+ * @param data - Company data without id and createdAt
+ * @returns Promise resolving to created company
+ */
+export async function createCompany(
+  data: Omit<Company, 'id' | 'createdAt'>
+): Promise<Company> {
+  if (!data.name?.trim() || !data.email?.trim()) {
+    throw new ApiError('Company name and email are required', 400, 'INVALID_DATA');
+  }
+  
+  return request<Company>('/companies', { 
+    method: 'POST', 
+    body: JSON.stringify(data) 
+  });
 }
 
 export async function getMembers(companyId?: string): Promise<Member[]> {

@@ -618,7 +618,91 @@ export function CEODashboard({ user, company, onLogout }: Props) {
 
 ---
 
-## Slide 12: Technology Stack
+## Slide 12: Clean Code & Best Programming Practices
+
+# **Google Coding Standards Implementation**
+
+### **🏆 Code Quality Standards Applied**
+
+#### **1. File Organization & Documentation**
+```javascript
+/**
+ * @fileoverview Attendance Management System Backend Server
+ * @description RESTful API server for managing attendance, users, and organizational data
+ * @author Attendance Management Team
+ * @version 1.0.0
+ */
+```
+- **JSDoc Documentation**: Complete function and class documentation
+- **File Headers**: Clear purpose and ownership information
+- **Import Organization**: External libraries before internal modules
+
+#### **2. Naming Conventions (Google Standards)**
+```javascript
+// Constants: SCREAMING_SNAKE_CASE
+const ALLOWED_ORIGINS = ['http://localhost:3000'];
+const DEFAULT_PORT = 3001;
+
+// Functions & Variables: camelCase
+const dbManager = new DatabaseManager();
+async function initializeConnection_() { }
+
+// Classes: PascalCase
+class DatabaseManager { }
+```
+
+#### **3. Error Handling Best Practices**
+```typescript
+class ApiError extends Error {
+  constructor(message: string, public status: number, public code?: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+```
+- **Custom Error Classes**: Type-safe error handling
+- **Comprehensive Try-Catch**: Proper error propagation
+- **User-Friendly Messages**: Clear error communication
+
+#### **4. TypeScript Best Practices**
+```typescript
+export async function login(
+  email: string, 
+  password?: string
+): Promise<{ user: User; token: string }> {
+  if (!email?.trim()) {
+    throw new ApiError('Email is required', 400, 'INVALID_EMAIL');
+  }
+}
+```
+- **Explicit Types**: Clear parameter and return types
+- **Input Validation**: Comprehensive data validation
+- **Generic Functions**: Reusable type-safe functions
+
+#### **5. Security & Performance**
+```javascript
+// SQL Injection Prevention
+const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+
+// Resource Management
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+```
+- **Parameterized Queries**: SQL injection prevention
+- **Request Timeouts**: Performance optimization
+- **Graceful Shutdown**: Proper resource cleanup
+
+### **🎯 Code Quality Achievements**
+- **Readability**: Clear naming and documentation
+- **Maintainability**: Modular structure and separation of concerns
+- **Reliability**: Comprehensive error handling
+- **Security**: Input sanitization and validation
+- **Performance**: Optimized database connections
+- **Testability**: Pure functions and dependency injection
+
+---
+
+## Slide 13: Technology Stack
 
 # **Technology Stack & Tools**
 

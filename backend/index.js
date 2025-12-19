@@ -1,48 +1,107 @@
-import express from "express";
-import cors from "cors";
-import { v4 as uuid } from "uuid";
-import pkg from "pg";
-import dotenv from "dotenv";
+/**
+ * @fileoverview Attendance Management System Backend Server
+ * @description RESTful API server for managing attendance, users, and organizational data
+ * @author Attendance Management Team
+ * @version 1.0.0
+ */
 
+import express from 'express';
+import cors from 'cors';
+import { v4 as uuid } from 'uuid';
+import pkg from 'pg';
+import dotenv from 'dotenv';
+
+// Load environment variables
 dotenv.config();
 
+// Constants
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3002', 
+  'http://localhost:5173'
+];
+
+const ALLOWED_METHODS = ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'];
+
+const DEFAULT_PORT = 3001;
+
+// Express app configuration
 const app = express();
+
+// Middleware setup
 app.use(express.json());
-app.use(
-  cors({
-    origin: ["http://localhost:3000", "http://localhost:3002", "http://localhost:5173"],
-    methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
-    credentials: false,
-  })
-);
+app.use(cors({
+  origin: ALLOWED_ORIGINS,
+  methods: ALLOWED_METHODS,
+  credentials: false,
+}));
 
 const { Pool } = pkg;
 
-// Singleton Pattern: Database Connection Manager
+/**
+ * Singleton Pattern: Database Connection Manager
+ * Ensures only one database connection instance exists throughout the application
+ */
 class DatabaseManager {
+  /**
+   * Creates or returns existing DatabaseManager instance
+   */
   constructor() {
     if (DatabaseManager.instance) {
       return DatabaseManager.instance;
     }
     
-    this.pool = null;
-    if (process.env.DATABASE_URL) {
-      this.pool = new Pool({ connectionString: process.env.DATABASE_URL });
-    }
+    this.pool_ = null;
+    this.initializeConnection_();
     
     DatabaseManager.instance = this;
     return this;
   }
   
-  getPool() {
-    return this.pool;
+  /**
+   * Initializes database connection if DATABASE_URL is provided
+   * @private
+   */
+  initializeConnection_() {
+    if (process.env.DATABASE_URL) {
+      this.pool_ = new Pool({ 
+        connectionString: process.env.DATABASE_URL,
+        max: 20, // Maximum number of clients in the pool
+        idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+        connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+      });
+    }
   }
   
-  async query(text, params) {
-    if (!this.pool) {
+  /**
+   * Returns the database connection pool
+   * @return {Pool|null} The PostgreSQL connection pool
+   */
+  getPool() {
+    return this.pool_;
+  }
+  
+  /**
+   * Executes a database query
+   * @param {string} text - SQL query string
+   * @param {Array} params - Query parameters
+   * @return {Promise<Object>} Query result
+   * @throws {Error} When database is not connected
+   */
+  async query(text, params = []) {
+    if (!this.pool_) {
       throw new Error('Database not connected');
     }
-    return this.pool.query(text, params);
+    return this.pool_.query(text, params);
+  }
+  
+  /**
+   * Closes the database connection pool
+   */
+  async close() {
+    if (this.pool_) {
+      await this.pool_.end();
+    }
   }
 }
 
@@ -297,56 +356,76 @@ const announcements = [
   },
 ];
 
+// In-memory storage (fallback when database is not available)
 const permissionRequests = [];
 const cases = [];
-const passwordChangeRequests = [];
 const ideas = [];
 
-app.get("/health", (req, res) => {
-  res.json({ ok: true });
+/**
+ * Health check endpoint
+ * @route GET /health
+ * @returns {Object} Health status
+ */
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, timestamp: new Date().toISOString() });
 });
 
-app.post("/login", (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email) {
-    res.status(400).json({ error: "email_required" });
-    return;
-  }
-  
-  const find = async () => {
-    if (pool) {
-      const r = await pool.query(`SELECT * FROM users WHERE email=$1 LIMIT 1`, [email]);
-      return r.rows[0];
+/**
+ * User authentication endpoint
+ * @route POST /login
+ * @param {string} email - User email address
+ * @param {string} password - User password (optional for demo)
+ * @returns {Object} User data and authentication token
+ */
+app.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    
+    // Validate required fields
+    if (!email) {
+      return res.status(400).json({ error: 'email_required' });
     }
-    return users.find((u) => u.email === email);
-  };
-  
-  find()
-    .then((dbUser) => {
-      if (!dbUser) {
-        res.status(404).json({ error: "user_not_found" });
-        return;
-      }
-      
-      // Check password if provided (for real authentication)
-      if (password && dbUser.password_hash && dbUser.password_hash !== password) {
-        res.status(401).json({ error: "invalid_credentials" });
-        return;
-      }
-      
-      // Return user data (excluding password)
-      const user = {
-        id: dbUser.id,
-        companyId: dbUser.company_id || dbUser.companyId,
-        name: dbUser.name,
-        email: dbUser.email,
-        role: dbUser.role,
-        suspended: dbUser.suspended || false
-      };
-      
-      res.json({ user, token: uuid() });
-    })
-    .catch(() => res.status(500).json({ error: "server_error" }));
+    
+    // Find user in database or fallback storage
+    let dbUser;
+    if (pool) {
+      const result = await pool.query(
+        'SELECT * FROM users WHERE email = $1 LIMIT 1', 
+        [email]
+      );
+      dbUser = result.rows[0];
+    } else {
+      dbUser = users.find((user) => user.email === email);
+    }
+    
+    if (!dbUser) {
+      return res.status(404).json({ error: 'user_not_found' });
+    }
+    
+    // Validate password if provided (for real authentication)
+    if (password && dbUser.password_hash && dbUser.password_hash !== password) {
+      return res.status(401).json({ error: 'invalid_credentials' });
+    }
+    
+    // Return sanitized user data (excluding password)
+    const sanitizedUser = {
+      id: dbUser.id,
+      companyId: dbUser.company_id || dbUser.companyId,
+      name: dbUser.name,
+      email: dbUser.email,
+      role: dbUser.role,
+      suspended: dbUser.suspended || false
+    };
+    
+    res.json({ 
+      user: sanitizedUser, 
+      token: uuid() 
+    });
+    
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'server_error' });
+  }
 });
 
 app.get("/companies", (req, res) => {
@@ -827,7 +906,25 @@ app.post("/ideas", (req, res) => {
   res.status(201).json(idea);
 });
 
-const port = process.env.PORT ? Number(process.env.PORT) : 3001;
+// Server startup
+const port = process.env.PORT ? Number(process.env.PORT) : DEFAULT_PORT;
+
+/**
+ * Graceful shutdown handler
+ */
+const gracefulShutdown = async () => {
+  console.log('Received shutdown signal, closing server gracefully...');
+  await dbManager.close();
+  process.exit(0);
+};
+
+// Handle shutdown signals
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+// Start server
 app.listen(port, () => {
-  process.stdout.write(`attendance backend listening on http://localhost:${port}\n`);
+  console.log(`🚀 Attendance Management Server running on http://localhost:${port}`);
+  console.log(`📊 Health check available at http://localhost:${port}/health`);
+  console.log(`🗄️  Database: ${pool ? 'Connected' : 'Using in-memory storage'}`);
 });
